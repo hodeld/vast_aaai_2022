@@ -6,8 +6,8 @@ from matplotlib import pyplot as plt
 import pickle
 import copy
 import random
-from WEAT import WEAT, SV_WEAT
-from helper_functions import pca_transform, form_representations, cosine_similarity
+from vast_aaai_2022.WEAT import WEAT, SV_WEAT
+from vast_aaai_2022.helper_functions import pca_transform, form_representations, cosine_similarity
 
 #Model
 MODEL_ID_GPT2 = 'gpt2'

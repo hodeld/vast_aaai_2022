@@ -6,7 +6,10 @@ from string import punctuation
 from os import path, listdir
 import pickle
 import copy
-from helper_functions import get_embeddings
+#from helper_functions import get_embeddings
+from vast_aaai_2022.file_paths import p_cola_test, p_cwe_dictionaries, p_new_contexts, p_belleza_lexicon, \
+    p_anew_lexicon, p_warriner_lexicon
+from vast_aaai_2022.helper_functions import get_embeddings
 from nltk import word_tokenize
 
 #Model
@@ -71,16 +74,16 @@ CURRENT_MODEL = MODEL_GPT2
 CURRENT_TOKENIZER = MODEL_TOKENIZER_GPT2
 WRITE_MODEL = 'gpt2'
 TEMPLATE = 'This is WORD'
-DUMP_PATH = f'D:\\cwe_dictionaries'
+DUMP_PATH = p_cwe_dictionaries
 TENSOR_TYPE = 'tf'
 
 #Load in lexica
-bellezza = pd.read_csv('Bellezza_Lexicon.csv')
+bellezza = pd.read_csv(p_belleza_lexicon)
 bellezza_terms = bellezza['word'].to_list()
 bellezza_valence = bellezza['combined_pleasantness'].to_list()
 bellezza_valence_dict = {bellezza_terms[idx]: bellezza_valence[idx] for idx in range(len(bellezza_terms))}
 
-anew = pd.read_csv('ANEW.csv')
+anew = pd.read_csv(p_anew_lexicon)
 anew_terms = anew['Description'].to_list()
 anew_valence = anew['Valence Mean'].to_list()
 anew_dominance = anew['Dominance Mean'].to_list()
@@ -90,7 +93,7 @@ anew_sd_dominance = anew['Dominance SD'].to_list()
 anew_sd_arousal = anew['Arousal SD'].to_list()
 anew_valence_dict = {anew_terms[idx]: anew_valence[idx] for idx in range(len(anew_terms))}
 
-warriner = pd.read_csv('Warriner_Lexicon.csv')
+warriner = pd.read_csv(p_warriner_lexicon)
 warriner_terms = warriner['Word'].to_list()
 warriner_terms[8289] = 'null'
 warriner_valence = warriner['V.Mean.Sum'].to_list()
@@ -105,13 +108,18 @@ term_list = list(set(bellezza_terms + anew_terms + warriner_terms + weat_terms +
 missing = list(term_list)
 context_dict = {}
 
-dir_ = f'D:\\new_contexts'
+dir_ = p_new_contexts
+cwe_dictionaries = p_cwe_dictionaries
 dir_list = list(listdir(dir_))
-
+if '.DS_Store' in dir_list:
+    dir_list.remove('.DS_Store')
 for target_file in dir_list:
     print(target_file)
     with open(path.join(dir_,target_file), 'rb') as pkl_reader:
-        contexts = pickle.load(pkl_reader)[0]
+        try:
+            contexts = pickle.load(pkl_reader)[0]
+        except pickle.UnpicklingError:
+            continue
     for context in contexts:
         if type(context) != str:
             continue
@@ -131,7 +139,7 @@ for target_file in dir_list:
                     context_dict[term] = ' '.join(tokenized_context[start:end])
                     pop_idx.append(idx)
                     print(term)
-                    with open(f'D:\\cwe_dictionaries\\updated_random_context_dictionary.pkl', 'wb') as pkl_writer:
+                    with open(path.join(cwe_dictionaries, 'updated_random_context_dictionary.pkl'), 'wb') as pkl_writer:
                         pickle.dump(context_dict, pkl_writer)
                     continue
                 except:
@@ -143,10 +151,16 @@ for target_file in dir_list:
     if not missing:
         break
 
-print(missing)
+#print(missing)
 
-with open(f'D:\\cwe_dictionaries\\random_context_dictionary.pkl', 'wb') as pkl_writer:
-    pickle.dump(context_dict, pkl_writer)
+
+if context_dict.items():
+    with open(path.join(cwe_dictionaries, 'random_context_dictionary_new.pkl'), 'wb') as pkl_writer:
+        pickle.dump(context_dict, pkl_writer)
+else:
+    with open(path.join(cwe_dictionaries, 'random_context_dictionary.pkl'), 'rb') as pkl_reader:
+        context_dict = pickle.load(pkl_reader)
+
 
 
 SETTING = 'aligned'
@@ -159,7 +173,7 @@ if SETTING == 'aligned' or SETTING == 'misaligned':
         if term not in term_valence_dict:
             term_valence_dict[term] = anew_valence[idx]
 
-    #Rescale Bellezza for consistency with other lexica
+    #Rescale Bellezza for consistency with other lexica from 1-5 to 1-9
     for idx, term in enumerate(bellezza_terms):
         if term not in term_valence_dict:
             term_valence_dict[term] = ((bellezza_valence[idx] - 1) * 2) + 1
@@ -178,6 +192,7 @@ if SETTING == 'aligned' or SETTING == 'misaligned':
 
     term_class_dict = {}
 
+    # groups valence of terms
     for term, valence in term_valence_dict.items():
         if valence <= 2.5:
             term_class_dict[term] = 0
@@ -190,6 +205,7 @@ if SETTING == 'aligned' or SETTING == 'misaligned':
         else:
             term_class_dict[term] = 4
 
+    # 4 highest valence -> context aligned with word
     aligned_context_dict = {0: 'It is very unpleasant to think about WORD',
         1: 'It is unpleasant to think about WORD',
         2: 'It is neither pleasant nor unpleasant to think about WORD',
@@ -205,12 +221,12 @@ if SETTING == 'aligned' or SETTING == 'misaligned':
 #Collect embeddings and write to a dictionary
 embedding_dict = {}
 
-SETTING = 'bleached'
+SETTING = None # 'bleached'
 if SETTING == 'bleached':
     embedding_dict = {}
 
     for idx, term in enumerate(term_list):
-        context = TEMPLATE.replace('WORD', term)
+        context = TEMPLATE.replace('WORD', term)  # writes "this is WORD"
         embedding_dict[term] = get_embeddings(term, context, CURRENT_MODEL, CURRENT_TOKENIZER, tensor_type=TENSOR_TYPE)
 
     with open(path.join(DUMP_PATH, f'{WRITE_MODEL}_{SETTING}.pkl'), 'wb') as pkl_writer:
@@ -220,6 +236,9 @@ SETTING = 'random'
 if SETTING == 'random':
 
     for idx, term in enumerate(term_list):
+        if context_dict.get(term, None) is None:
+            print(f'missing term in context_dict: {term}')
+            continue
         embedding_dict[term] = get_embeddings(term, context_dict[term], CURRENT_MODEL, CURRENT_TOKENIZER, tensor_type=TENSOR_TYPE)
         print(f'{term} worked')
 
@@ -288,13 +307,13 @@ for idx in range(len(ids)):
     pos = pos_tag(word_tokenize(new_))[-1]
     gpt2_pos[idx] = pos
 
-with open(f'D:\\cola_test\\trunc_vectors_val.pkl','wb') as pkl_writer:
+with open(path.join(p_cola_test, 'trunc_vectors_val.pkl'),'wb') as pkl_writer:
     pickle.dump(trunc_dict,pkl_writer)
 
-with open(f'D:\\cola_test\\gpt2_preds_val.pkl','wb') as pkl_writer:
+with open(path.join(p_cola_test, 'gpt2_preds_val.pkl'),'wb') as pkl_writer:
     pickle.dump(gpt2_predictions,pkl_writer)
 
-with open(f'D:\\cola_test\\gpt2_pred_pos_val.pkl','wb') as pkl_writer:
+with open(path.join(p_cola_test, 'gpt2_pred_pos_val.pkl'),'wb') as pkl_writer:
     pickle.dump(gpt2_pos,pkl_writer)
 
 print('done trunced')
@@ -306,7 +325,7 @@ for idx in range(len(ids)):
     last_hs = np.array(output[-1][12][0][-1])
     last_dict[idx] = last_hs
 
-with open(f'D:\\cola_test\\last_vectors_val.pkl','wb') as pkl_writer:
+with open(path.join(p_cola_test, 'last_vectors_val.pkl'),'wb') as pkl_writer:
     pickle.dump(last_dict,pkl_writer)
 
 print('done last')
@@ -318,7 +337,7 @@ for idx in range(len(ids)):
     last_hs = np.array(output[-1][12][0][-1])
     no_punct_dict[idx] = last_hs
 
-with open(f'D:\\cola_test\\no_punct_vectors_val.pkl','wb') as pkl_writer:
+with open(path.join(p_cola_test, 'no_punct_vectors_val.pkl'),'wb') as pkl_writer:
     pickle.dump(no_punct_dict,pkl_writer)
 
 print('done everything')

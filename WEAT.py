@@ -1,5 +1,5 @@
 import numpy as np
-from helper_functions import cosine_similarity, std_deviation, create_permutation
+from vast_aaai_2022.helper_functions import cosine_similarity, std_deviation, create_permutation
 from scipy.stats import norm
 import random
 
