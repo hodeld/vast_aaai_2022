@@ -13,7 +13,7 @@ from vast_aaai_2022.file_paths import p_cola_test, p_cwe_dictionaries, p_new_con
 from vast_aaai_2022.helper_functions import get_embeddings
 from nltk import word_tokenize
 
-from vast_aaai_2022.terms import term_list, anew_terms, warriner_valence_dict, anew_valence, bellezza_terms, \
+from vast_aaai_2022.terms import term_list_weat as term_list, anew_terms, warriner_valence_dict, anew_valence, bellezza_terms, \
     bellezza_valence, pleasant_weat, unpleasant_weat, neutral_weat
 
 

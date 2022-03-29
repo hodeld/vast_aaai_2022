@@ -48,22 +48,37 @@ physical = ['sick','illness','influenza','disease','virus','cancer']
 young = ['Tiffany','Michelle','Cindy','Kristy','Brad','Eric','Joey','Billy']
 old = ['Ethel','Bernice','Gertrude','Agnes','Cecil','Wilbert','Mortimer','Edgar']
 
+#VAST | Greedily obtained from ANEW lexicon - multiply tokenized by GPT-2
+multi_pleasant = ['masterful','dignified','politeness','easygoing','sailboat','blossom','dazzle','soothe','fascinate','jolly','refreshment','elated','luscious','carefree','untroubled','cuddle','christmas','caress','snuggle','rollercoaster','valentine','sweetheart']
+multi_unpleasant = ['suffocate','syphilis','rabies','ulcer','mutilate','pollute','morgue','disloyal','toothache','seasick','unfaithful','maggot','leprosy','anguished','detest','stench','crucify','humiliate','gangrene','regretful','lice','roach','putrid']
+
+multi_dominance = ['bathtub','glamour','carefree','nourish','valentine','garter','lightbulb','caress','detest','cuddle','sailboat','swimmer','zest','sweetheart','decorate','dignified','bouquet','fascinate','jolly','penthouse','masterful']
+multi_submission = ['humiliate','shamed','unfaithful','flabby','syphilis','gangrene','mutilate','seasick','despairing','impotent','regretful','suffocate','anguished','scapegoat','ache','louse','sissy','morgue','meek','crucify','wasp','deserter']
+
+multi_arousal = ['valentine','pollute','rabies','cockroach','ulcer','humiliate','unfaithful','elated','pervert','christmas','leprosy','dazzle','cyclone','mutilate','crucify','disloyal','guillotine','roach','infatuation','skijump','rollercoaster']
+multi_indifferent = ['fatigued','dreary','nonchalant','hairpin','mantel','mucus','prairie','dustpan','kerchief','overcast','utensil','hairdryer','hydrant','golfer','slush','politeness','windmill','thermometer','cork','leisurely','meek','handicap']
+
+
+
 #Scripting Area
 
-weat_terms = list(set(flower + insect + instrument + weapon + ea_name + aa_name + ea_name_2 + aa_name_2 + pleasant + unpleasant + pleasant_2 + unpleasant_2 + young + old + male_name + female_name + career + domestic + male + female + science + mathematics + art + art_2))
+weat_terms_weat = list(set(flower + insect + instrument + weapon + ea_name + aa_name + ea_name_2 + aa_name_2 + pleasant + unpleasant + pleasant_2 + unpleasant_2 + young + old + male_name + female_name + career + domestic + male + female + science + mathematics + art + art_2))
 pleasant_weat = list(set(flower + instrument + ea_name + ea_name_2 + pleasant + pleasant_2 + young))
 unpleasant_weat = list(set(insect + weapon + aa_name + aa_name_2 + unpleasant + unpleasant_2 + old))
 neutral_weat = list(set(male_name + female_name + career + domestic + male + female + science + mathematics + art + art_2))
 
+#VAST
+weat_terms_vast = list(set(flower + insect + instrument + weapon + ea_name + aa_name + ea_name_2 + aa_name_2 + pleasant + unpleasant + pleasant_2 + unpleasant_2 + young + old + male_name + female_name + career + domestic + male + female + science + mathematics + art + art_2 + dominant + arousal + submissive + indifference))
+
 
 
 #Load in lexica
-bellezza = pd.read_csv(p_belleza_lexicon)
+bellezza = pd.read_csv(p_belleza_lexicon)  # 'Bellezza_Lexicon.csv'
 bellezza_terms = bellezza['word'].to_list()
 bellezza_valence = bellezza['combined_pleasantness'].to_list()
 bellezza_valence_dict = {bellezza_terms[idx]: bellezza_valence[idx] for idx in range(len(bellezza_terms))}
 
-anew = pd.read_csv(p_anew_lexicon)
+anew = pd.read_csv(p_anew_lexicon)  #'ANEW.csv'
 anew_terms = anew['Description'].to_list()
 anew_valence = anew['Valence Mean'].to_list()
 anew_dominance = anew['Dominance Mean'].to_list()
@@ -73,6 +88,11 @@ anew_sd_dominance = anew['Dominance SD'].to_list()
 anew_sd_arousal = anew['Arousal SD'].to_list()
 anew_valence_dict = {anew_terms[idx]: anew_valence[idx] for idx in range(len(anew_terms))}
 
+#VAST
+anew_arousal_dict = {anew_terms[idx]: anew_arousal[idx] for idx in range(len(anew_terms))}
+anew_dominance_dict = {anew_terms[idx]: anew_dominance[idx] for idx in range(len(anew_terms))}
+
+#both
 warriner = pd.read_csv(p_warriner_lexicon)
 warriner_terms = warriner['Word'].to_list()
 warriner_terms[8289] = 'null'
@@ -84,4 +104,17 @@ warriner_sd_dominance = warriner['D.SD.Sum'].to_list()
 warriner_sd_arousal = warriner['A.SD.Sum'].to_list()
 warriner_valence_dict = {warriner_terms[idx]: warriner_valence[idx] for idx in range(len(warriner_terms))}
 
-term_list = list(set(bellezza_terms + anew_terms + warriner_terms + weat_terms + arousal + dominant + indifference + submissive))
+term_list_weat = list(set(bellezza_terms + anew_terms + warriner_terms + weat_terms_weat + arousal + dominant + indifference + submissive))
+
+#VAST
+warriner_arousal_dict = {warriner_terms[idx]: warriner_arousal[idx] for idx in range(len(warriner_terms)) if warriner_terms[idx] not in arousal + indifference}
+warriner_dominance_dict = {warriner_terms[idx]: warriner_dominance[idx] for idx in range(len(warriner_terms)) if warriner_terms[idx] not in dominant + submissive}
+warriner_terms_valence = [key for key in warriner_valence_dict.keys()]
+warriner_terms_arousal = [key for key in warriner_arousal_dict.keys()]
+warriner_terms_dominance = [key for key in warriner_dominance_dict.keys()]
+warriner_valence = [value for value in warriner_valence_dict.values()]
+warriner_arousal = [value for value in warriner_arousal_dict.values()]
+warriner_dominance = [value for value in warriner_dominance_dict.values()]
+
+#
+term_list_vast = list(set(bellezza_terms + anew_terms + warriner_terms + weat_terms_vast))

@@ -16,7 +16,7 @@ nltk.download('universal_tagset')
 
 BIN = True
 TEST = 'POS'
-
+#todo paths
 with open(f'D:\\cola_test\\prev_word_vectors.pkl', 'rb') as pkl_reader:
     cola = pickle.load(pkl_reader)
 

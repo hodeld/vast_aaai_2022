@@ -24,3 +24,5 @@ p_cola_out_domain_dev = join(file_parent, misc_data, cola, 'out_of_domain_dev.ts
 p_reddit_comments = join(file_parent, misc_data, 'reddit_comments')
 p_reddit_comments_file = join(p_reddit_comments, 'RC_2005-12')
 p_reddit_comments_missing = join(p_reddit_comments, 'missing.pkl')
+
+p_ws353_csv = join(misc_data, 'ws353', 'combined.csv')
