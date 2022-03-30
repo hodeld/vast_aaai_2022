@@ -9,12 +9,13 @@ from os import path, listdir
 import pickle
 import copy
 from vast_aaai_2022.file_paths import p_cola_test, p_cwe_dictionaries, p_new_contexts, p_cola_in_domain_dev, \
-    p_term_contexts_dic
+    p_term_contexts_dic, p_ws353_csv
 from vast_aaai_2022.helper_functions import get_embeddings
 from nltk import word_tokenize
 
-from vast_aaai_2022.terms import term_list_weat as term_list, anew_terms, warriner_valence_dict, anew_valence, bellezza_terms, \
-    bellezza_valence, pleasant_weat, unpleasant_weat, neutral_weat
+from vast_aaai_2022.terms import term_list_weat as term_list, anew_terms, warriner_valence_dict, anew_valence, \
+    bellezza_terms, \
+    bellezza_valence, pleasant_weat, unpleasant_weat, neutral_weat, tokenization_analysis_terms
 
 
 def set_embeddings(emb_d, t, c, model, current_tokenizer, tens_type):
@@ -23,6 +24,21 @@ def set_embeddings(emb_d, t, c, model, current_tokenizer, tens_type):
     except ValueError:
         return
     emb_d[t] = emb
+
+
+def set_aligned(t_list):
+    """
+    for different term lists
+    term_class_dict and aligned_context_dict include all terms
+    """
+    for idx, term in enumerate(t_list):
+        context = aligned_context_dict[term_class_dict[term]].replace('WORD', term)
+        set_embeddings(embedding_dict, term, context, CURRENT_MODEL, CURRENT_TOKENIZER, TENSOR_TYPE)
+
+    with open(path.join(DUMP_PATH, f'{WRITE_MODEL}_{SETTING}.pkl'), 'wb') as pkl_writer:
+        pickle.dump(embedding_dict, pkl_writer)
+
+    print(f'{SETTING} done')
 
 
 #Model
@@ -43,7 +59,10 @@ DO_RANDOM = False
 DO_TRUE_RANDOM = False
 DO_ALIGNED = False
 DO_MISALIGNED = False
-DO_COLA_TEST_EMBEDDINGS = True
+DO_COLA_TEST_EMBEDDINGS = False
+DO_CREATE_TOKENIZE_DICT = False
+DO_WS353 = False
+DO_ALIGNED_MULTI = True
 
 missing = list(term_list)
 context_dict = {}
@@ -73,7 +92,7 @@ missing = [m for m in missing if m not in context_dict.keys()]
 print('missing: ', len(missing))
 
 #Set valence for aligned contexts
-if DO_ALIGNED or DO_MISALIGNED:
+if DO_ALIGNED or DO_MISALIGNED or DO_ALIGNED_MULTI:
 
     term_valence_dict = copy.deepcopy(warriner_valence_dict)
 
@@ -177,15 +196,7 @@ if DO_TRUE_RANDOM:
 if DO_ALIGNED:
     SETTING = 'aligned'
     embedding_dict = {}
-
-    for idx, term in enumerate(term_list):
-        context = aligned_context_dict[term_class_dict[term]].replace('WORD', term)
-        set_embeddings(embedding_dict, term, context, CURRENT_MODEL, CURRENT_TOKENIZER, TENSOR_TYPE)
-
-    with open(path.join(DUMP_PATH, f'{WRITE_MODEL}_{SETTING}.pkl'), 'wb') as pkl_writer:
-        pickle.dump(embedding_dict, pkl_writer)
-
-    print(f'{SETTING} done')
+    set_aligned(term_list, suffix='')
 
 if DO_MISALIGNED:
     SETTING = 'misaligned'
@@ -271,5 +282,37 @@ if DO_COLA_TEST_EMBEDDINGS:
 
     with open(path.join(p_cola_test, 'no_punct_vectors_val.pkl'),'wb') as pkl_writer:
         pickle.dump(no_punct_dict,pkl_writer)
+
+
+if DO_CREATE_TOKENIZE_DICT:  # note: used for vast
+    tokenizer = CURRENT_TOKENIZER
+    tokenization_d = {}
+    for term in tokenization_analysis_terms:
+        tokenized_term = tokenizer.encode(term, add_special_tokens=False, add_prefix_space=True)
+        tokenization_d[term] = len(tokenized_term)
+
+    with open(path.join(p_cwe_dictionaries, f'tokenization_dictionary_{WRITE_MODEL}.pkl'), 'wb') as pkl_writer:
+        pickle.dump(tokenization_d, pkl_writer)
+    print('tokenization_dictionary done')
+
+if DO_WS353:
+    embedding_dict = {}
+    SETTING = 'bleached'
+    ws353 = pd.read_csv(p_ws353_csv, sep=',')
+    word_1 = ws353['Word 1'].to_list()
+    word_2 = ws353['Word 2'].to_list()
+    for term in list(set(word_1 + word_2)):
+        context = TEMPLATE.replace('WORD', term)  # writes "this is WORD"
+        set_embeddings(embedding_dict, term, context, CURRENT_MODEL, CURRENT_TOKENIZER, TENSOR_TYPE)
+
+    with open(path.join(p_cwe_dictionaries, f'{WRITE_MODEL}_ws353_dict.pkl'), 'wb') as pkl_writer:
+        pickle.dump(embedding_dict, pkl_writer)
+
+    print(f'WS353_{SETTING} done')
+
+if DO_ALIGNED_MULTI:
+    SETTING = 'aligned_multi'
+    embedding_dict = {}
+    set_aligned(multi_terms)
 
 print('done everything')

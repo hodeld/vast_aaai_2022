@@ -35,6 +35,8 @@ AROUSAL_GROUND_TRUTH = (bellezza_valence, anew_arousal)
 LEXICON = ('Bellezza', 'ANEW')
 DIMENSION = ('Valence', 'Dominance', 'Arousal')
 
+DO_WS353 = False
+
 with open(path.join(p_cwe_dictionaries, f'{WRITE_MODEL}_{SETTING}.pkl'), 'rb') as pkl_reader:
     embedding_dict = pickle.load(pkl_reader)
 
@@ -167,7 +169,7 @@ if POLAR_TOKENIZATION == 'single':
     A = A_single
     B = B_single
 
-if POLAR_TOKENIZATION == 'multi':
+if POLAR_TOKENIZATION == 'multi':  # multi_pleasant needs to be embedded
     A = multi_pleasant
     B = multi_unpleasant
 
@@ -427,66 +429,66 @@ plt.show()
 
 
 #Validation on Other Intrinsic Evaluations
+if DO_WS353:
+    ws353 = pd.read_csv(p_ws353_csv, sep=',')
+    word_1 = ws353['Word 1'].to_list()
+    word_2 = ws353['Word 2'].to_list()
+    human = ws353['Human (Mean)'].to_list()
 
-ws353 = pd.read_csv(p_ws353_csv, sep=',')
-word_1 = ws353['Word 1'].to_list()
-word_2 = ws353['Word 2'].to_list()
-human = ws353['Human (Mean)'].to_list()
+    with open(path.join(p_cwe_dictionaries, f'{WRITE_MODEL}_ws353_dict.pkl'),'rb') as pkl_reader:
+        emb_dict = pickle.load(pkl_reader)
 
-with open(path.join(p_cwe_dictionaries, 'gpt_2_ws353_dict.pkl'),'rb') as pkl_reader:  # todo
-    emb_dict = pickle.load(pkl_reader)
+    LAYERS = list(range(13))
+    layer_perf = []
 
-LAYERS = list(range(13))
-layer_perf = []
+    for layer in LAYERS:
+        cos_sims = []
+        for idx in range(len(word_1)):
+            w1_emb = emb_dict[word_1[idx]][layer]
+            w2_emb = emb_dict[word_2[idx]][layer]
+            cs = cosine_similarity(w1_emb,w2_emb)
+            cos_sims.append(cs)
+        ws = spearmanr(cos_sims,human)[0]
+        print(layer)
+        print(ws)
+        layer_perf.append(ws)
 
-for layer in LAYERS:
-    cos_sims = []
-    for idx in range(len(word_1)):
-        w1_emb = emb_dict[word_1[idx]][layer]
-        w2_emb = emb_dict[word_2[idx]][layer]
-        cs = cosine_similarity(w1_emb,w2_emb)
-        cos_sims.append(cs)
-    ws = spearmanr(cos_sims,human)[0]
-    print(layer)
-    print(ws)
-    layer_perf.append(ws)
+    plt.plot(list(range(13)),layer_perf,marker='o')
+    plt.xlabel('Layer')
+    plt.ylabel('Spearman Coefficient')
+    plt.title('WS-353 Performance by Layer')
+    plt.show()
 
-plt.plot(list(range(13)),layer_perf,marker='o')
-plt.xlabel('Layer')
-plt.ylabel('Spearman Coefficient')
-plt.title('WS-353 Performance by Layer')
-plt.show()
+    LAYER = 12
+    SUBTRACT_MEAN = True
+    PC_RANGE = range(1,13)
 
-LAYER = 12
-SUBTRACT_MEAN = True
-PC_RANGE = range(1,13)
+    pc_perf = []
 
-pc_perf = []
+    for pc_rem in PC_RANGE:
+        cos_sims = []
+        pca_dict = {}
+        ws_arr = np.array([value[LAYER] for key, value in emb_dict.items()])
+        ws_words = [key for key, value in emb_dict.items()]
 
-for pc_rem in PC_RANGE:
-    cos_sims = []
-    pca_dict = {}
-    ws_arr = np.array([value[LAYER] for key, value in emb_dict.items()])
-    ws_words = [key for key, value in emb_dict.items()]
+        pc_arr, pc_top = pca_transform(ws_arr,pc_rem,subtract_mean=SUBTRACT_MEAN)
 
-    pc_arr, pc_top = pca_transform(ws_arr,pc_rem,subtract_mean=SUBTRACT_MEAN)
+        for idx, word in enumerate(ws_words):
+            pca_dict[word] = pc_arr[idx]
 
-    for idx, word in enumerate(ws_words):
-        pca_dict[word] = pc_arr[idx]
-    
-    for idx in range(len(word_1)):
-        w1_emb = pca_dict[word_1[idx]]
-        w2_emb = pca_dict[word_2[idx]]
-        cs = cosine_similarity(w1_emb,w2_emb)
-        cos_sims.append(cs)
-    
-    ws = spearmanr(cos_sims,human)[0]
-    print(ws)
+        for idx in range(len(word_1)):
+            w1_emb = pca_dict[word_1[idx]]
+            w2_emb = pca_dict[word_2[idx]]
+            cs = cosine_similarity(w1_emb,w2_emb)
+            cos_sims.append(cs)
 
-    pc_perf.append(ws)
+        ws = spearmanr(cos_sims,human)[0]
+        print(ws)
 
-plt.plot(list(PC_RANGE),pc_perf,marker='o',label='PCs Removed')
-plt.xlabel('Principal Components Removed')
-plt.ylabel('Spearman Coefficient')
-plt.title('WS-353 Performance by PCs Removed')
-plt.show()
+        pc_perf.append(ws)
+
+    plt.plot(list(PC_RANGE),pc_perf,marker='o',label='PCs Removed')
+    plt.xlabel('Principal Components Removed')
+    plt.ylabel('Spearman Coefficient')
+    plt.title('WS-353 Performance by PCs Removed')
+    plt.show()

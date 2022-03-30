@@ -9,7 +9,7 @@ from nltk import word_tokenize
 
 from vast_aaai_2022.file_paths import p_term_contexts_dic, p_reddit_comments_file, p_reddit_comments_missing, \
     p_pushshift_missing, p_new_contexts, p_reddit_comments
-from vast_aaai_2022.terms import term_list
+from vast_aaai_2022.terms import term_list_weat as term_list
 
 FROM_PICKLE_FILE = False
 

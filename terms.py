@@ -68,7 +68,7 @@ unpleasant_weat = list(set(insect + weapon + aa_name + aa_name_2 + unpleasant + 
 neutral_weat = list(set(male_name + female_name + career + domestic + male + female + science + mathematics + art + art_2))
 
 #VAST
-weat_terms_vast = list(set(flower + insect + instrument + weapon + ea_name + aa_name + ea_name_2 + aa_name_2 + pleasant + unpleasant + pleasant_2 + unpleasant_2 + young + old + male_name + female_name + career + domestic + male + female + science + mathematics + art + art_2 + dominant + arousal + submissive + indifference))
+weat_terms_vast = list(set(weat_terms_weat + dominant + arousal + submissive + indifference))
 
 
 
@@ -118,3 +118,7 @@ warriner_dominance = [value for value in warriner_dominance_dict.values()]
 
 #
 term_list_vast = list(set(bellezza_terms + anew_terms + warriner_terms + weat_terms_vast))
+
+# new -> terms used in VAST.py
+tokenization_analysis_terms = list(set(pleasant + unpleasant + warriner_terms))
+multi_terms = list(set(multi_pleasant + multi_unpleasant))
