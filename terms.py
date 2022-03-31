@@ -104,6 +104,7 @@ warriner_sd_dominance = warriner['D.SD.Sum'].to_list()
 warriner_sd_arousal = warriner['A.SD.Sum'].to_list()
 warriner_valence_dict = {warriner_terms[idx]: warriner_valence[idx] for idx in range(len(warriner_terms))}
 
+# anew_terms includes multi_pleasant and multi_unpleasant
 term_list_weat = list(set(bellezza_terms + anew_terms + warriner_terms + weat_terms_weat + arousal + dominant + indifference + submissive))
 
 #VAST
@@ -121,4 +122,5 @@ term_list_vast = list(set(bellezza_terms + anew_terms + warriner_terms + weat_te
 
 # new -> terms used in VAST.py
 tokenization_analysis_terms = list(set(pleasant + unpleasant + warriner_terms))
-multi_terms = list(set(multi_pleasant + multi_unpleasant))
+term_list_multi = list(set(multi_pleasant + multi_unpleasant))
+terms_list_all = list(set(term_list_multi + term_list_weat))

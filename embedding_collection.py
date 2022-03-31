@@ -13,9 +13,10 @@ from vast_aaai_2022.file_paths import p_cola_test, p_cwe_dictionaries, p_new_con
 from vast_aaai_2022.helper_functions import get_embeddings
 from nltk import word_tokenize
 
-from vast_aaai_2022.terms import term_list_weat as term_list, anew_terms, warriner_valence_dict, anew_valence, \
+from vast_aaai_2022.pushshift_data import load_context_dict
+from vast_aaai_2022.terms import term_list_weat, anew_terms, warriner_valence_dict, anew_valence, \
     bellezza_terms, \
-    bellezza_valence, pleasant_weat, unpleasant_weat, neutral_weat, tokenization_analysis_terms
+    bellezza_valence, pleasant_weat, unpleasant_weat, neutral_weat, tokenization_analysis_terms, terms_list_all
 
 
 def set_embeddings(emb_d, t, c, model, current_tokenizer, tens_type):
@@ -53,7 +54,6 @@ TEMPLATE = 'This is WORD'
 DUMP_PATH = p_cwe_dictionaries
 TENSOR_TYPE = 'tf'
 
-DO_READ_CONTEXT_DICT = False
 DO_BLEACHED = False
 DO_RANDOM = False
 DO_TRUE_RANDOM = False
@@ -62,37 +62,20 @@ DO_MISALIGNED = False
 DO_COLA_TEST_EMBEDDINGS = False
 DO_CREATE_TOKENIZE_DICT = False
 DO_WS353 = False
-DO_ALIGNED_MULTI = True
 
+term_list = terms_list_all
 missing = list(term_list)
 context_dict = {}
 
-dir_ = p_new_contexts
-cwe_dictionaries = p_cwe_dictionaries
-dir_list = list(listdir(dir_))
 
-if DO_READ_CONTEXT_DICT:
-
-    for f in dir_list:
-        if 'missing' in f or '.pkl' not in f:
-            continue
-        print(f)
-        with open(path.join(dir_, f), 'rb') as r:
-            context_d_i = pickle.load(r)
-            context_dict.update(context_d_i)
-
-    if context_dict.items():
-        with open(path.join(cwe_dictionaries, 'random_context_dictionary_new.pkl'), 'wb') as pkl_writer:
-            pickle.dump(context_dict, pkl_writer)
-else:
-    with open(path.join(cwe_dictionaries, 'random_context_dictionary.pkl'), 'rb') as pkl_reader:
-        context_dict = pickle.load(pkl_reader)
+with open(path.join(p_cwe_dictionaries, 'random_context_dictionary.pkl'), 'rb') as pkl_reader:
+    context_dict = pickle.load(pkl_reader)
 
 missing = [m for m in missing if m not in context_dict.keys()]
 print('missing: ', len(missing))
 
 #Set valence for aligned contexts
-if DO_ALIGNED or DO_MISALIGNED or DO_ALIGNED_MULTI:
+if DO_ALIGNED or DO_MISALIGNED:
 
     term_valence_dict = copy.deepcopy(warriner_valence_dict)
 
@@ -310,9 +293,5 @@ if DO_WS353:
 
     print(f'WS353_{SETTING} done')
 
-if DO_ALIGNED_MULTI:
-    SETTING = 'aligned_multi'
-    embedding_dict = {}
-    set_aligned(multi_terms)
 
 print('done everything')

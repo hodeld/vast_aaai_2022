@@ -8,12 +8,48 @@ import pickle
 import copy
 import random
 from vast_aaai_2022.WEAT import WEAT, SV_WEAT
-from vast_aaai_2022.file_paths import p_cwe_dictionaries, p_ws353_csv
+from vast_aaai_2022.file_paths import p_cwe_dictionaries, p_ws353_csv, p_pushshift_missing
 from vast_aaai_2022.helper_functions import pca_transform, form_representations, cosine_similarity
 from vast_aaai_2022.terms import bellezza_terms, anew_terms, bellezza_valence, anew_valence, anew_dominance, \
     anew_arousal, pleasant, unpleasant, dominant, submissive, arousal, indifference, warriner_valence_dict, \
     warriner_valence, warriner_dominance, warriner_arousal, term_list_vast as term_list, multi_pleasant, \
     multi_unpleasant, ea_name, aa_name, warriner_terms_valence, warriner_terms_dominance, warriner_terms_arousal
+
+
+def get_clean_formset_repr(t_list, layer_i, rep_type, t_list2=None):
+    """
+    deletes bad terms in t_list and t_list2
+    :return: list of form_representations, forbidden terms
+    """
+    li = []
+    del_li = []
+    for t in t_list:
+        cwe_li = [embedding_dict[t][layer_i]]
+        if len(cwe_li[0]) == 0:
+            print('cwe_list empty: ' + t)
+            del_li.append(t)
+            continue
+
+        t_vector = form_representations(cwe_li, rep_type=rep_type)[0]
+        li.append(t_vector)
+    if t_list2:
+        for t in del_li:
+            i = t_list.index(t)
+            del t_list2[i]
+            del t_list[i]
+    else:
+        for t in del_li:
+            t_list.remove(t)
+    return li, del_li
+
+
+def delete_forbidden_items(li1, li2, del_li):
+    forbidden_idc = [li1.index(t) for t in li1 if t in del_li]
+    cleaned_li2 = np.delete(np.array(li2), forbidden_idc)
+    cleaned_li1 = np.delete(np.array(li1), forbidden_idc)
+    return cleaned_li1, cleaned_li2
+
+
 
 MODEL_ID_GPT2 = 'gpt2'
 MODEL_GPT2 = TFGPT2LMHeadModel.from_pretrained(MODEL_ID_GPT2, output_hidden_states = True, output_attentions = False)
@@ -44,7 +80,9 @@ if SETTING == 'misaligned':
     with open(path.join(p_cwe_dictionaries, f'{WRITE_MODEL}_aligned.pkl'), 'rb') as pkl_reader:  # todo why aligned dict?
         weat_dict = pickle.load(pkl_reader)
 else:
-    weat_dict = {key: embedding_dict[key] for key in pleasant + unpleasant + dominant + submissive + arousal + indifference}
+    #weat_dict = embedding_dict
+    weat_dict = {key: embedding_dict[key] for key in (
+        pleasant + unpleasant + dominant + submissive + arousal + indifference + multi_pleasant + multi_unpleasant)}
 
 lexicon_valence = []
 lexicon_dominance = []
@@ -191,12 +229,8 @@ for subtoken_type in SUBTOKEN_TYPES:
         A_vectors = form_representations([weat_dict[a][layer] for a in A], rep_type = subtoken_type)
         B_vectors = form_representations([weat_dict[b][layer] for b in B], rep_type = subtoken_type)
 
-        associations = []
-
-        for w in TARGET_W:
-            w_vector = form_representations([embedding_dict[w][layer]], rep_type = subtoken_type)[0]
-            association = SV_WEAT(w_vector, A_vectors, B_vectors)[0]
-            associations.append(association)
+        form_set_repr, forbidden_terms = get_clean_formset_repr(TARGET_W,  layer, subtoken_type, GROUND_TRUTH)
+        associations = [SV_WEAT(w_vector, A_vectors, B_vectors)[0] for w_vector in form_set_repr]
 
         vast = pearsonr(GROUND_TRUTH, associations)[0]
         print(f'{WRITE_MODEL} Layer {layer} VAST {subtoken_type}: {vast}')
@@ -265,10 +299,15 @@ key_idx = ['Removed', 'Top']
 term_list = list(embedding_dict.keys())
 weat_terms = list(weat_dict.keys())
 
-vector_arr = np.array(form_representations([embedding_dict[term][LAYER] for term in embedding_dict.keys()], rep_type = SUBTOKEN_TYPE))
-weat_arr = np.array(form_representations([weat_dict[term][LAYER] for term in weat_dict.keys()], rep_type = SUBTOKEN_TYPE))
+
+form_set_repr, forbidden_terms_v = get_clean_formset_repr(term_list, LAYER, SUBTOKEN_TYPE) # note deletes terms in term_list
+vector_arr = np.array(form_set_repr)
+form_set_repr = get_clean_formset_repr(weat_terms, LAYER, SUBTOKEN_TYPE)
+weat_arr, forbidden_terms_w = np.array(form_set_repr)
+
 
 vector_arr = np.concatenate((vector_arr,weat_arr),axis=0)
+forbidden_terms = forbidden_terms_v + forbidden_terms_w
 
 for i in PC_RANGE:
 
@@ -323,16 +362,23 @@ for i in PC_RANGE:
             anew_scores_aro[key_idx[idx]].append(pearsonr(anew_associations_aro, anew_arousal)[0])
             print(f'{CHART_MODEL} Layer {LAYER} ANEW Arousal {i} PCs {key_idx[idx]}: {pearsonr(anew_associations_aro, anew_arousal)[0]}')
 
-        if 'warriner' in lexica:
-            warriner_associations_val = [SV_WEAT(vector_dict[w], A_vectors_val, B_vectors_val)[0] for w in warriner_terms_valence]
+        if 'warriner' in lexica: # todo if w is not in vector
+            warriner_terms_valence, warriner_valence = delete_forbidden_items(warriner_terms_valence, warriner_valence, forbidden_terms)
+            warriner_terms_dominance, warriner_dominance = delete_forbidden_items(warriner_terms_dominance, warriner_dominance, forbidden_terms)
+            warriner_terms_arousal, warriner_arousal = delete_forbidden_items(warriner_terms_arousal, warriner_arousal, forbidden_terms)
+
+            warriner_associations_val = [SV_WEAT(vector_dict[w], A_vectors_val, B_vectors_val)[0]
+                                         for w in warriner_terms_valence]
             warriner_scores_val[key_idx[idx]].append(pearsonr(warriner_associations_val, warriner_valence)[0])
             print(f'{CHART_MODEL} Layer {LAYER} Warriner VAST {i} PCs {key_idx[idx]}: {pearsonr(warriner_associations_val, warriner_valence)[0]}')
 
-            warriner_associations_dom = [SV_WEAT(vector_dict[w], A_vectors_dom, B_vectors_dom)[0] for w in warriner_terms_dominance]
+            warriner_associations_dom = [SV_WEAT(vector_dict[w], A_vectors_dom, B_vectors_dom)[0]
+                                         for w in warriner_terms_dominance]
             warriner_scores_dom[key_idx[idx]].append(pearsonr(warriner_associations_dom, warriner_dominance)[0])
             print(f'{CHART_MODEL} Layer {LAYER} Warriner Dominance {i} PCs {key_idx[idx]}: {pearsonr(warriner_associations_dom, warriner_dominance)[0]}')
 
-            warriner_associations_aro = [SV_WEAT(vector_dict[w], A_vectors_aro, B_vectors_aro)[0] for w in warriner_terms_arousal]
+            warriner_associations_aro = [SV_WEAT(vector_dict[w], A_vectors_aro, B_vectors_aro)[0]
+                                         for w in warriner_terms_arousal]
             warriner_scores_aro[key_idx[idx]].append(pearsonr(warriner_associations_aro, warriner_arousal)[0])
             print(f'{CHART_MODEL} Layer {LAYER} Warriner Arousal {i} PCs {key_idx[idx]}: {pearsonr(warriner_associations_aro, warriner_arousal)[0]}')
 
@@ -387,8 +433,8 @@ BIAS = 'Top Layer Flowers vs. Insects Bias'
 LAYER = 12
 SUBTRACT_MEAN = True
 
-term_list = list(embedding_dict.keys())
-vector_arr = np.array(form_representations([embedding_dict[term][LAYER] for term in embedding_dict.keys()], rep_type = SUBTOKEN_TYPE))
+#term_list = list(embedding_dict.keys())
+vector_arr = np.array(form_representations([embedding_dict[term][LAYER] for term in term_list], rep_type = SUBTOKEN_TYPE))
 
 bias_pcs_removed = []
 bias_top_pcs = []
