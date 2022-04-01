@@ -95,7 +95,8 @@ anew_dominance_dict = {anew_terms[idx]: anew_dominance[idx] for idx in range(len
 #both
 warriner = pd.read_csv(p_warriner_lexicon)
 warriner_terms = warriner['Word'].to_list()
-warriner_terms[8289] = 'null'
+warriner_terms[8289] = 'null' #44457
+warriner_terms[4455] = 'false' # replaced FALSE
 warriner_valence = warriner['V.Mean.Sum'].to_list()
 warriner_dominance = warriner['D.Mean.Sum'].to_list()
 warriner_arousal = warriner['A.Mean.Sum'].to_list()
@@ -122,5 +123,3 @@ term_list_vast = list(set(bellezza_terms + anew_terms + warriner_terms + weat_te
 
 # new -> terms used in VAST.py
 tokenization_analysis_terms = list(set(pleasant + unpleasant + warriner_terms))
-term_list_multi = list(set(multi_pleasant + multi_unpleasant))
-terms_list_all = list(set(term_list_multi + term_list_weat))

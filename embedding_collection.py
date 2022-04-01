@@ -16,7 +16,7 @@ from nltk import word_tokenize
 from vast_aaai_2022.pushshift_data import load_context_dict
 from vast_aaai_2022.terms import term_list_weat, anew_terms, warriner_valence_dict, anew_valence, \
     bellezza_terms, \
-    bellezza_valence, pleasant_weat, unpleasant_weat, neutral_weat, tokenization_analysis_terms, terms_list_all
+    bellezza_valence, pleasant_weat, unpleasant_weat, neutral_weat, tokenization_analysis_terms, term_list_weat
 
 
 def set_embeddings(emb_d, t, c, model, current_tokenizer, tens_type):
@@ -42,6 +42,19 @@ def set_aligned(t_list):
     print(f'{SETTING} done')
 
 
+def get_existing(t_list=None, fname=None):
+    if t_list is None:
+        t_list = term_list
+    if fname is None:
+        fname = f'{WRITE_MODEL}_{SETTING}.pkl'
+
+    with open(path.join(DUMP_PATH, fname), 'rb') as rf:
+        emb_d = pickle.load(rf)
+
+    missing_i = [m for m in t_list if m not in emb_d.keys()]
+    return emb_d, missing_i
+
+
 #Model
 MODEL_ID_GPT2 = 'gpt2'
 MODEL_GPT2 = TFGPT2LMHeadModel.from_pretrained(MODEL_ID_GPT2, output_hidden_states = True, output_attentions = False)
@@ -56,22 +69,21 @@ TENSOR_TYPE = 'tf'
 
 DO_BLEACHED = False
 DO_RANDOM = False
-DO_TRUE_RANDOM = False
+DO_TRUE_RANDOM = True
 DO_ALIGNED = False
 DO_MISALIGNED = False
 DO_COLA_TEST_EMBEDDINGS = False
 DO_CREATE_TOKENIZE_DICT = False
 DO_WS353 = False
+DO_EXTEND_EXISTING = True
 
-term_list = terms_list_all
-missing = list(term_list)
-context_dict = {}
+term_list = term_list_weat
 
 
 with open(path.join(p_cwe_dictionaries, 'random_context_dictionary.pkl'), 'rb') as pkl_reader:
     context_dict = pickle.load(pkl_reader)
 
-missing = [m for m in missing if m not in context_dict.keys()]
+missing = [m for m in term_list if m not in context_dict.keys()]
 print('missing: ', len(missing))
 
 #Set valence for aligned contexts
@@ -128,13 +140,11 @@ if DO_ALIGNED or DO_MISALIGNED:
         1: 'It is pleasant to think about WORD',
         0: 'It is very pleasant to think about WORD',}
 
-#Collect embeddings and write to a dictionary -> gets replaced for each setting
-embedding_dict = {}
-
+#Collect embeddings and write to a dictionary -> because of missing in random always new dict
 
 if DO_BLEACHED:
     SETTING = 'bleached'
-    #embedding_dict = {}
+    embedding_dict = {}
 
     for idx, term in enumerate(term_list):
         context = TEMPLATE.replace('WORD', term)  # writes "this is WORD"
@@ -147,8 +157,13 @@ if DO_BLEACHED:
 
 if DO_RANDOM:
     SETTING = 'random'
+    if DO_EXTEND_EXISTING:
+        embedding_dict, term_list_i = get_existing()
+    else:
+        term_list_i = term_list
+        embedding_dict = {}
 
-    for idx, term in enumerate(term_list):
+    for idx, term in enumerate(term_list_i):
         if context_dict.get(term, None) is None:
             print(f'missing term in context_dict: {term}')
             continue
@@ -162,13 +177,21 @@ if DO_RANDOM:
 
 if DO_TRUE_RANDOM:
     SETTING = 'true_random'
-    ordered_term_list = list(context_dict.keys())
-    random_term_list = copy.copy(ordered_term_list)
-    random.shuffle(random_term_list)
-    context_list = list(context_dict.values())
-    for random_term, real_term, context in zip(random_term_list, ordered_term_list, context_list):
-        context = context.replace(real_term, random_term)
-        term = random_term
+    if DO_EXTEND_EXISTING:
+        embedding_dict, term_list_i = get_existing()
+    else:
+        term_list_i = term_list
+        embedding_dict = {}
+
+    len_li = len(term_list_i)
+    for term in term_list_i:
+        if context_dict.get(term, None) is None:
+            print(f'missing term in context_dict: {term}')
+            continue
+        random_idx = random.randint(0, len_li)
+        random_term = term_list_i[random_idx]
+        random_context = context_dict[random_term]
+        context = random_context.replace(random_term, term)
         set_embeddings(embedding_dict, term, context, CURRENT_MODEL, CURRENT_TOKENIZER, TENSOR_TYPE)
 
     with open(path.join(DUMP_PATH, f'{WRITE_MODEL}_{SETTING}.pkl'), 'wb') as pkl_writer:
@@ -183,7 +206,7 @@ if DO_ALIGNED:
 
 if DO_MISALIGNED:
     SETTING = 'misaligned'
-    #embedding_dict = {}
+    embedding_dict = {}
 
     for idx, term in enumerate(term_list):
         context = misaligned_context_dict[term_class_dict[term]].replace('WORD', term)
@@ -269,12 +292,19 @@ if DO_COLA_TEST_EMBEDDINGS:
 
 if DO_CREATE_TOKENIZE_DICT:  # note: used for vast
     tokenizer = CURRENT_TOKENIZER
-    tokenization_d = {}
-    for term in tokenization_analysis_terms:
+    SETTING = 'true_random'
+    fname = f'tokenization_dictionary_{WRITE_MODEL}.pkl'
+    if DO_EXTEND_EXISTING:
+        tokenization_d, term_list_i = get_existing(t_list=tokenization_analysis_terms, fname=fname)
+    else:
+        term_list_i = tokenization_analysis_terms
+        tokenization_d = {}
+
+    for term in term_list_i:
         tokenized_term = tokenizer.encode(term, add_special_tokens=False, add_prefix_space=True)
         tokenization_d[term] = len(tokenized_term)
 
-    with open(path.join(p_cwe_dictionaries, f'tokenization_dictionary_{WRITE_MODEL}.pkl'), 'wb') as pkl_writer:
+    with open(path.join(p_cwe_dictionaries, fname), 'wb') as pkl_writer:
         pickle.dump(tokenization_d, pkl_writer)
     print('tokenization_dictionary done')
 
@@ -284,11 +314,19 @@ if DO_WS353:
     ws353 = pd.read_csv(p_ws353_csv, sep=',')
     word_1 = ws353['Word 1'].to_list()
     word_2 = ws353['Word 2'].to_list()
-    for term in list(set(word_1 + word_2)):
+    fname = f'{WRITE_MODEL}_ws353_dict.pkl'
+    ws_terms = list(set(word_1 + word_2))
+    if DO_EXTEND_EXISTING:
+        embedding_dict, term_list_i = get_existing(t_list=ws_terms, fname=fname)
+    else:
+        term_list_i = ws_terms
+        embedding_dict = {}
+
+    for term in term_list_i:
         context = TEMPLATE.replace('WORD', term)  # writes "this is WORD"
         set_embeddings(embedding_dict, term, context, CURRENT_MODEL, CURRENT_TOKENIZER, TENSOR_TYPE)
 
-    with open(path.join(p_cwe_dictionaries, f'{WRITE_MODEL}_ws353_dict.pkl'), 'wb') as pkl_writer:
+    with open(path.join(p_cwe_dictionaries, fname), 'wb') as pkl_writer:
         pickle.dump(embedding_dict, pkl_writer)
 
     print(f'WS353_{SETTING} done')

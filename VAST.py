@@ -50,6 +50,12 @@ def delete_forbidden_items(li1, li2, del_li):
     return cleaned_li1, cleaned_li2
 
 
+def remove_missing(li_i, del_li):
+    """modify list"""
+    for t in del_li:
+        if t in li_i:
+            li_i.remove(t)
+
 
 MODEL_ID_GPT2 = 'gpt2'
 MODEL_GPT2 = TFGPT2LMHeadModel.from_pretrained(MODEL_ID_GPT2, output_hidden_states = True, output_attentions = False)
@@ -59,8 +65,8 @@ MODEL_TOKENIZER_GPT2 = GPT2Tokenizer.from_pretrained(MODEL_ID_GPT2)
 #Layerwise VAST by Experimental Setting
 WRITE_MODEL = 'gpt2'
 CHART_MODEL = 'GPT-2'
-SETTING = 'random'
-WRITE_SETTING = 'Random'
+SETTING = 'bleached'
+WRITE_SETTING = SETTING.upper()
 
 LAYERS = range(13)
 SUBTOKEN_TYPE = 'Last'
@@ -76,13 +82,41 @@ DO_WS353 = False
 with open(path.join(p_cwe_dictionaries, f'{WRITE_MODEL}_{SETTING}.pkl'), 'rb') as pkl_reader:
     embedding_dict = pickle.load(pkl_reader)
 
+# remove missing terms
+all_terms_list = (bellezza_terms, anew_terms, pleasant, unpleasant, dominant, submissive, arousal,
+                 indifference, multi_pleasant, multi_unpleasant)
+all_terms = []
+for li in all_terms_list:
+    all_terms.extend(li)
+all_terms = list(set(all_terms))
+
+# remove missing terms
+term_list = list(embedding_dict.keys())
+missing_t = [t for t in all_terms if t not in term_list]
+
+for li in all_terms_list:
+    remove_missing(li, missing_t)
+
+
 if SETTING == 'misaligned':
     with open(path.join(p_cwe_dictionaries, f'{WRITE_MODEL}_aligned.pkl'), 'rb') as pkl_reader:  # todo why aligned dict?
         weat_dict = pickle.load(pkl_reader)
 else:
     #weat_dict = embedding_dict
+
+
+    weat_terms_orig = (pleasant + unpleasant + dominant + submissive + arousal +
+                       indifference + multi_pleasant + multi_unpleasant)
+    missing_t = [t for t in weat_terms_orig if t not in term_list]
+    weat_li = (pleasant, unpleasant, dominant, submissive, arousal,
+                 indifference, multi_pleasant, multi_unpleasant)
+    for l in weat_li:
+        remove_missing(l, missing_t)
+    
     weat_dict = {key: embedding_dict[key] for key in (
-        pleasant + unpleasant + dominant + submissive + arousal + indifference + multi_pleasant + multi_unpleasant)}
+        pleasant + unpleasant + dominant + submissive + arousal + indifference + multi_pleasant + multi_unpleasant)
+                 if key in term_list}
+    weat_terms = list(weat_dict.keys())
 
 lexicon_valence = []
 lexicon_dominance = []
@@ -296,8 +330,6 @@ warriner_scores_aro = {'Removed': [], 'Top': []}
 
 key_idx = ['Removed', 'Top']
 
-term_list = list(embedding_dict.keys())
-weat_terms = list(weat_dict.keys())
 
 
 form_set_repr, forbidden_terms_v = get_clean_formset_repr(term_list, LAYER, SUBTOKEN_TYPE) # note deletes terms in term_list
@@ -362,7 +394,7 @@ for i in PC_RANGE:
             anew_scores_aro[key_idx[idx]].append(pearsonr(anew_associations_aro, anew_arousal)[0])
             print(f'{CHART_MODEL} Layer {LAYER} ANEW Arousal {i} PCs {key_idx[idx]}: {pearsonr(anew_associations_aro, anew_arousal)[0]}')
 
-        if 'warriner' in lexica: # todo if w is not in vector
+        if 'warriner' in lexica:
             warriner_terms_valence, warriner_valence = delete_forbidden_items(warriner_terms_valence, warriner_valence, forbidden_terms)
             warriner_terms_dominance, warriner_dominance = delete_forbidden_items(warriner_terms_dominance, warriner_dominance, forbidden_terms)
             warriner_terms_arousal, warriner_arousal = delete_forbidden_items(warriner_terms_arousal, warriner_arousal, forbidden_terms)

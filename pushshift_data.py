@@ -9,7 +9,7 @@ from nltk import word_tokenize
 
 from vast_aaai_2022.file_paths import p_reddit_comments_file, p_reddit_comments_missing, \
      p_new_contexts, p_reddit_comments, p_cwe_dictionaries
-from vast_aaai_2022.terms import terms_list_all
+from vast_aaai_2022.terms import term_list_weat
 
 FROM_PICKLE_FILE = False
 
@@ -52,18 +52,18 @@ def download_comments():
         return True
 
     p_main = p_new_contexts
-    base_url = 'https://api.pushshift.io/reddit/search/comment/?q={query}&fields=body&size=10'
+    base_url = 'https://api.pushshift.io/reddit/search/comment/?q={query}&fields=body&size={size}'
 
-    term_list = terms_list_all
+    term_list = term_list_weat
     context_dict = load_context_dict()
 
     missing = [m for m in term_list if m not in context_dict.keys()]
 
     orig_missing_len = len(missing)
-
+    size_start = 10
     for i in range(5):
         for term in iter(missing):
-            url = base_url.format(query=term)
+            url = base_url.format(query=term, size=(i+1)*size_start)
             request = requests.get(url)
             if request.ok is False:
                 if request.status_code == 429:
