@@ -36,10 +36,14 @@ def set_aligned(t_list):
         context = aligned_context_dict[term_class_dict[term]].replace('WORD', term)
         set_embeddings(embedding_dict, term, context, CURRENT_MODEL, CURRENT_TOKENIZER, TENSOR_TYPE)
 
-    with open(path.join(DUMP_PATH, f'{WRITE_MODEL}_{SETTING}.pkl'), 'wb') as pkl_writer:
-        pickle.dump(embedding_dict, pkl_writer)
+    save_embedding(t_list)
 
-    print(f'{SETTING} done')
+
+def save_embedding(t_list=term_list_weat):
+    with open(path.join(DUMP_PATH, f'{WRITE_MODEL}_{SETTING}.pkl'), 'wb') as w:
+        pickle.dump(embedding_dict, w)
+
+    print(f'{SETTING} done. embedded {len(t_list)} new terms')
 
 
 def get_existing(t_list=None, fname=None):
@@ -68,8 +72,8 @@ DUMP_PATH = p_cwe_dictionaries
 TENSOR_TYPE = 'tf'
 
 DO_BLEACHED = False
-DO_RANDOM = False
-DO_TRUE_RANDOM = True
+DO_RANDOM = True
+DO_TRUE_RANDOM = False
 DO_ALIGNED = False
 DO_MISALIGNED = False
 DO_COLA_TEST_EMBEDDINGS = False
@@ -144,16 +148,17 @@ if DO_ALIGNED or DO_MISALIGNED:
 
 if DO_BLEACHED:
     SETTING = 'bleached'
-    embedding_dict = {}
+    if DO_EXTEND_EXISTING:
+        embedding_dict, term_list_i = get_existing()
+    else:
+        term_list_i = term_list
+        embedding_dict = {}
 
-    for idx, term in enumerate(term_list):
+    for idx, term in enumerate(term_list_i):
         context = TEMPLATE.replace('WORD', term)  # writes "this is WORD"
         set_embeddings(embedding_dict, term, context, CURRENT_MODEL, CURRENT_TOKENIZER,  TENSOR_TYPE)
 
-    with open(path.join(DUMP_PATH, f'{WRITE_MODEL}_{SETTING}.pkl'), 'wb') as pkl_writer:
-        pickle.dump(embedding_dict, pkl_writer)
-
-    print(f'{SETTING} done')
+    save_embedding(term_list_i)
 
 if DO_RANDOM:
     SETTING = 'random'
@@ -170,10 +175,7 @@ if DO_RANDOM:
         context = context_dict[term]
         set_embeddings(embedding_dict, term, context, CURRENT_MODEL, CURRENT_TOKENIZER, TENSOR_TYPE)
 
-    with open(path.join(DUMP_PATH, f'{WRITE_MODEL}_{SETTING}.pkl'), 'wb') as pkl_writer:
-        pickle.dump(embedding_dict, pkl_writer)
-
-    print(f'{SETTING} done')
+    save_embedding(term_list_i)
 
 if DO_TRUE_RANDOM:
     SETTING = 'true_random'
@@ -194,28 +196,31 @@ if DO_TRUE_RANDOM:
         context = random_context.replace(random_term, term)
         set_embeddings(embedding_dict, term, context, CURRENT_MODEL, CURRENT_TOKENIZER, TENSOR_TYPE)
 
-    with open(path.join(DUMP_PATH, f'{WRITE_MODEL}_{SETTING}.pkl'), 'wb') as pkl_writer:
-        pickle.dump(embedding_dict, pkl_writer)
-
-    print(f'{SETTING} done')
+    save_embedding(term_list_i)
 
 if DO_ALIGNED:
     SETTING = 'aligned'
-    embedding_dict = {}
-    set_aligned(term_list, suffix='')
+    if DO_EXTEND_EXISTING:
+        embedding_dict, term_list_i = get_existing()
+    else:
+        term_list_i = term_list
+        embedding_dict = {}
+
+    set_aligned(term_list_i)
 
 if DO_MISALIGNED:
     SETTING = 'misaligned'
-    embedding_dict = {}
+    if DO_EXTEND_EXISTING:
+        embedding_dict, term_list_i = get_existing()
+    else:
+        term_list_i = term_list
+        embedding_dict = {}
 
-    for idx, term in enumerate(term_list):
+    for idx, term in enumerate(term_list_i):
         context = misaligned_context_dict[term_class_dict[term]].replace('WORD', term)
         set_embeddings(embedding_dict, term, context, CURRENT_MODEL, CURRENT_TOKENIZER, TENSOR_TYPE)
 
-    with open(path.join(DUMP_PATH, f'{WRITE_MODEL}_{SETTING}.pkl'), 'wb') as pkl_writer:
-        pickle.dump(embedding_dict, pkl_writer)
-
-    print(f'{SETTING} done')
+    save_embedding(term_list_i)
 
 if DO_COLA_TEST_EMBEDDINGS:
     #  Get CoLA Test Embeddings
