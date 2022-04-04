@@ -297,7 +297,6 @@ if DO_COLA_TEST_EMBEDDINGS:
 
 if DO_CREATE_TOKENIZE_DICT:  # note: used for vast
     tokenizer = CURRENT_TOKENIZER
-    SETTING = 'true_random'
     fname = f'tokenization_dictionary_{WRITE_MODEL}.pkl'
     if DO_EXTEND_EXISTING:
         tokenization_d, term_list_i = get_existing(t_list=tokenization_analysis_terms, fname=fname)

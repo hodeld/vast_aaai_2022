@@ -13,8 +13,8 @@ from vast_aaai_2022.helper_functions import pca_transform, form_representations,
 from vast_aaai_2022.terms import bellezza_terms, anew_terms, bellezza_valence, anew_valence, anew_dominance, \
     anew_arousal, pleasant, unpleasant, dominant, submissive, arousal, indifference, warriner_valence_dict, \
     warriner_valence, warriner_dominance, warriner_arousal, term_list_vast as term_list, multi_pleasant, \
-    multi_unpleasant, ea_name, aa_name, warriner_terms_valence, warriner_terms_dominance, warriner_terms_arousal
-
+    multi_unpleasant, ea_name, aa_name, warriner_terms_valence, warriner_terms_dominance, warriner_terms_arousal, \
+    flower, insect
 
 MODEL_ID_GPT2 = 'gpt2'
 MODEL_GPT2 = TFGPT2LMHeadModel.from_pretrained(MODEL_ID_GPT2, output_hidden_states = True, output_attentions = False)
@@ -37,7 +37,9 @@ LEXICON = ('Bellezza', 'ANEW')
 DIMENSION = ('Valence', 'Dominance', 'Arousal')
 
 DO_VAST_SETTING = False
-DO_TOKENIZATION_ANALYSIS = True
+DO_TOKENIZATION_ANALYSIS = False
+DO_PC_REMOVAL_ANALYSIS = False
+DO_WS353_ANALYSIS = True
 
 
 def get_clean_formset_repr(t_list, layer_i, rep_type, t_list2=None):
@@ -192,13 +194,11 @@ def tokenization_analysis(weat_dict_i):
     #Tokenization Analysis
     A = pleasant
     B = unpleasant
-    POLAR_TOKENIZATION = 'multi'
+    POLAR_TOKENIZATION = 'single'
     LEXICON = 'Warriner'
     SUBTOKEN_TYPES = ('First', 'Last', 'Mean', 'Max')
 
     ground_truth_dict = warriner_valence_dict
-
-    subtoken_vasts = []
 
     #Evolution of Subtoken Representations
     with open(path.join(p_cwe_dictionaries, f'tokenization_dictionary_{WRITE_MODEL}.pkl'), 'rb') as pkl_reader:
@@ -214,7 +214,7 @@ def tokenization_analysis(weat_dict_i):
     A_single = A_single[:final_len]
     B_single = B_single[:final_len]
 
-    print(len(A_single))
+    print(len('# polar words per group', A_single))
 
     term_dict_single = {key: value for key, value in ground_truth_dict.items() if tokenization_dict[key] == 1}
     term_dict_multi = {key: value for key, value in ground_truth_dict.items() if key not in term_dict_single}
@@ -264,8 +264,15 @@ def tokenization_analysis(weat_dict_i):
             A_vectors = form_representations([weat_dict_i[a][layer] for a in A], rep_type = subtoken_type)
             B_vectors = form_representations([weat_dict_i[b][layer] for b in B], rep_type = subtoken_type)
 
-            form_set_repr, forbidden_terms = get_clean_formset_repr(TARGET_W,  layer, subtoken_type, GROUND_TRUTH)
-            associations = [SV_WEAT(w_vector, A_vectors, B_vectors)[0] for w_vector in form_set_repr]
+            associations = []
+
+            for w in TARGET_W:
+                w_vector = form_representations([embedding_dict[w][layer]], rep_type=subtoken_type)[0]
+                association = SV_WEAT(w_vector, A_vectors, B_vectors)[0]
+                associations.append(association)
+
+            #form_set_repr, forbidden_terms = get_clean_formset_repr(TARGET_W,  layer, subtoken_type, GROUND_TRUTH)
+            #associations = [SV_WEAT(w_vector, A_vectors, B_vectors)[0] for w_vector in form_set_repr]
 
             vast = pearsonr(GROUND_TRUTH, associations)[0]
             print(f'{WRITE_MODEL} Layer {layer} VAST {subtoken_type}: {vast}')
@@ -275,14 +282,12 @@ def tokenization_analysis(weat_dict_i):
         vast_scores.append(subtoken_vasts)
         plt.plot(LAYERS, subtoken_vasts, label = f'Multi - {subtoken_type}', marker = 'o')
 
-    A = multi_pleasant
-    B = multi_unpleasant
-    TARGET_W = target_single_terms
+    TARGET_W = target_single_terms  # single token
     GROUND_TRUTH = target_single_valence
     subtoken_type = 'Last'
 
     subtoken_vasts = []
-
+    # single token ->
     for idx, layer in enumerate(LAYERS):
 
         A_vectors = form_representations([weat_dict_i[a][layer] for a in A], rep_type = subtoken_type)
@@ -305,7 +310,7 @@ def tokenization_analysis(weat_dict_i):
     plt.plot(LAYERS, subtoken_vasts, label = 'Single Token', marker = 'o')
     plt.xlabel('Layer')
     plt.ylabel('VAST Score')
-    plt.title(f'{CHART_MODEL} Warriner Tokenization VASTs - {WRITE_SETTING} Setting - Multi-Token Polar Words')
+    plt.title(f'{CHART_MODEL} Warriner Tokenization VASTs - {WRITE_SETTING} Setting - {POLAR_TOKENIZATION}-Token Polar Words')
     plt.legend()
     plt.show()
 
@@ -399,11 +404,6 @@ def pc_removal_analysis():
                 print(f'{CHART_MODEL} Layer {LAYER} ANEW Arousal {i} PCs {key_idx[idx]}: {pearsonr(anew_associations_aro, anew_arousal)[0]}')
 
             if 'warriner' in lexica:
-                #todo
-                warriner_terms_valence, warriner_valence = delete_forbidden_items(warriner_terms_valence, warriner_valence, forbidden_terms)
-                warriner_terms_dominance, warriner_dominance = delete_forbidden_items(warriner_terms_dominance, warriner_dominance, forbidden_terms)
-                warriner_terms_arousal, warriner_arousal = delete_forbidden_items(warriner_terms_arousal, warriner_arousal, forbidden_terms)
-
                 warriner_associations_val = [SV_WEAT(vector_dict[w], A_vectors_val, B_vectors_val)[0]
                                              for w in warriner_terms_valence]
                 warriner_scores_val[key_idx[idx]].append(pearsonr(warriner_associations_val, warriner_valence)[0])
@@ -462,11 +462,13 @@ def pc_removal_analysis():
     plt.show()
 
 
-#Bias Tests
+    #Bias Tests
     A = pleasant
     B = unpleasant
-    X = ea_name
-    Y = aa_name
+    #X = ea_name
+    #Y = aa_name
+    X = flower
+    Y = insect
     BIAS = 'Top Layer Flowers vs. Insects Bias'
     LAYER = 12
     SUBTRACT_MEAN = True
@@ -517,7 +519,7 @@ def ws353_analysis():
     ws353 = pd.read_csv(p_ws353_csv, sep=',')
     word_1 = ws353['Word 1'].to_list()
     word_2 = ws353['Word 2'].to_list()
-    human = ws353['Human (Mean)'].to_list()
+    human = ws353['Human (mean)'].to_list()
 
     with open(path.join(p_cwe_dictionaries, f'{WRITE_MODEL}_ws353_dict.pkl'),'rb') as pkl_reader:
         emb_dict = pickle.load(pkl_reader)
@@ -528,8 +530,8 @@ def ws353_analysis():
     for layer in LAYERS:
         cos_sims = []
         for idx in range(len(word_1)):
-            w1_emb = emb_dict[word_1[idx]][layer]
-            w2_emb = emb_dict[word_2[idx]][layer]
+            w1_emb = emb_dict[word_1[idx]][layer][0]
+            w2_emb = emb_dict[word_2[idx]][layer][0]
             cs = cosine_similarity(w1_emb,w2_emb)
             cos_sims.append(cs)
         ws = spearmanr(cos_sims,human)[0]
@@ -543,7 +545,7 @@ def ws353_analysis():
     plt.title('WS-353 Performance by Layer')
     plt.show()
 
-    LAYER = 12
+    LAYER = 8  # 12
     SUBTRACT_MEAN = True
     PC_RANGE = range(1,13)
 
@@ -552,7 +554,7 @@ def ws353_analysis():
     for pc_rem in PC_RANGE:
         cos_sims = []
         pca_dict = {}
-        ws_arr = np.array([value[LAYER] for key, value in emb_dict.items()])
+        ws_arr = np.array([value[LAYER][0] for key, value in emb_dict.items()])
         ws_words = [key for key, value in emb_dict.items()]
 
         pc_arr, pc_top = pca_transform(ws_arr,pc_rem,subtract_mean=SUBTRACT_MEAN)
@@ -574,7 +576,7 @@ def ws353_analysis():
     plt.plot(list(PC_RANGE),pc_perf,marker='o',label='PCs Removed')
     plt.xlabel('Principal Components Removed')
     plt.ylabel('Spearman Coefficient')
-    plt.title('WS-353 Performance by PCs Removed')
+    plt.title(f'WS-353 Performance by PCs Removed layer {LAYER} - {WRITE_SETTING}')
     plt.show()
 
 
@@ -607,3 +609,8 @@ if __name__ == "__main__":
     if DO_TOKENIZATION_ANALYSIS:
         tokenization_analysis(weat_dict)
 
+    if DO_PC_REMOVAL_ANALYSIS:
+        pc_removal_analysis()
+
+    if DO_WS353_ANALYSIS:
+        ws353_analysis()
